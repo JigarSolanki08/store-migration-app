@@ -30,7 +30,7 @@ const ENTITY_CONFIG = {
   products: {
     label: "Products",
     icon: "📦",
-    requiredColumns: ["Handle", "Title", "Variant Price"],
+    requiredColumns: ["Handle", "Title"],
     importFn: importProducts,
   },
   customers: {
