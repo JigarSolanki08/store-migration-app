@@ -1,6 +1,7 @@
 import { json, unstable_parseMultipartFormData, unstable_createMemoryUploadHandler } from "@remix-run/node";
 import { useActionData, useLoaderData, useSubmit, useNavigation } from "@remix-run/react";
 import { useState, useCallback } from "react";
+import Papa from "papaparse";
 import {
   Page,
   Layout,
@@ -107,7 +108,12 @@ export const action = async ({ request, params }) => {
   }
 
   const text = await file.text();
-  const rows = parseCSV(text);
+
+  // Use papaparse for robust CSV parsing (handles multi-line quoted fields, etc.)
+  const parseResult = Papa.parse(text, {
+    skipEmptyLines: true,
+  });
+  const rows = parseResult.data;
 
   if (rows.length < 2) {
     return json({ error: "CSV file is empty or has no data rows." });

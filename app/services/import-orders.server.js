@@ -7,6 +7,11 @@ function getCol(headers, row, name) {
   return i >= 0 ? row[i]?.trim() || "" : "";
 }
 
+// Delay helper to avoid API rate limiting
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function importOrders({ admin, rows, headers }) {
   const dataRows = rows.slice(1);
   let imported = 0;
@@ -83,6 +88,9 @@ export async function importOrders({ admin, rows, headers }) {
 
       const draftOrderId = createJson.data?.draftOrderCreate?.draftOrder?.id;
 
+      // Small delay before completing the draft order
+      await delay(200);
+
       // Complete draft order (mark as paid)
       const completeResponse = await admin.graphql(
         `#graphql
@@ -105,6 +113,11 @@ export async function importOrders({ admin, rows, headers }) {
     } catch (err) {
       failed++;
       errors.push(`Row ${i + 2} (${email}): ${err.message}`);
+    }
+
+    // Rate-limit: delay between orders to avoid API throttling
+    if (i < dataRows.length - 1) {
+      await delay(300);
     }
   }
 

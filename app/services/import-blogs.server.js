@@ -5,6 +5,11 @@ function getCol(headers, row, name) {
   return i >= 0 ? row[i]?.trim() || "" : "";
 }
 
+// Delay helper to avoid API rate limiting
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function importBlogs({ admin, rows, headers }) {
   const dataRows = rows.slice(1);
   let imported = 0;
@@ -31,6 +36,7 @@ export async function importBlogs({ admin, rows, headers }) {
       // Create or retrieve blog
       let blogId = blogCache.get(blogHandle);
       if (!blogId) {
+        // First, try to create the blog
         const blogResponse = await admin.graphql(
           `#graphql
             mutation blogCreate($blog: BlogCreateInput!) {
@@ -39,17 +45,35 @@ export async function importBlogs({ admin, rows, headers }) {
                 userErrors { field message }
               }
             }`,
-          { variables: { blog: { title: blogTitle || blogHandle } } }
+          { variables: { blog: { title: blogTitle || blogHandle, handle: blogHandle } } }
         );
         const blogJson = await blogResponse.json();
         const blogErrors = blogJson.data?.blogCreate?.userErrors || [];
-        if (blogErrors.length > 0 && !blogErrors[0].message.includes("already")) {
-          // If "already exists" we'll try to query it; otherwise fail
-          failed++;
-          errors.push(`Row ${i + 2}: Blog creation error: ${blogErrors.map((e) => e.message).join(", ")}`);
-          continue;
+
+        if (blogErrors.length > 0) {
+          // If blog already exists, try to query for it by handle
+          const queryResponse = await admin.graphql(
+            `#graphql
+              query getBlogByHandle($handle: String!) {
+                blogByHandle(handle: $handle) {
+                  id
+                  title
+                }
+              }`,
+            { variables: { handle: blogHandle } }
+          );
+          const queryJson = await queryResponse.json();
+          blogId = queryJson.data?.blogByHandle?.id;
+
+          if (!blogId) {
+            failed++;
+            errors.push(`Row ${i + 2}: Blog "${blogTitle}" creation failed: ${blogErrors.map((e) => e.message).join(", ")}`);
+            continue;
+          }
+        } else {
+          blogId = blogJson.data?.blogCreate?.blog?.id;
         }
-        blogId = blogJson.data?.blogCreate?.blog?.id;
+
         if (blogId) blogCache.set(blogHandle, blogId);
       }
 
@@ -98,6 +122,11 @@ export async function importBlogs({ admin, rows, headers }) {
     } catch (err) {
       failed++;
       errors.push(`Row ${i + 2}: ${err.message}`);
+    }
+
+    // Rate-limit: small delay between API calls to avoid throttling
+    if (i < dataRows.length - 1) {
+      await delay(250);
     }
   }
 

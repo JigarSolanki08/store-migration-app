@@ -5,6 +5,11 @@ function getCol(headers, row, name) {
   return i >= 0 ? row[i]?.trim() || "" : "";
 }
 
+// Delay helper to avoid API rate limiting
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function importPages({ admin, rows, headers }) {
   const dataRows = rows.slice(1);
   let imported = 0;
@@ -23,15 +28,14 @@ export async function importPages({ admin, rows, headers }) {
     }
 
     const handle = getCol(headers, row, "Handle");
-    const author = getCol(headers, row, "Author");
     const published = getCol(headers, row, "Published").toLowerCase();
     const metaDesc = getCol(headers, row, "Metafield: Description Tag");
 
+    // Note: PageCreateInput does NOT have an "author" field in the GraphQL API
     const pageInput = {
       title,
       body,
       handle: handle || null,
-      author: author || null,
       isPublished: published === "true" || published === "yes",
     };
 
@@ -86,6 +90,11 @@ export async function importPages({ admin, rows, headers }) {
     } catch (err) {
       failed++;
       errors.push(`Row ${i + 2} ("${title}"): ${err.message}`);
+    }
+
+    // Rate-limit: small delay between API calls to avoid throttling
+    if (i < dataRows.length - 1) {
+      await delay(250);
     }
   }
 

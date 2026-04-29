@@ -5,6 +5,11 @@ function getCol(headers, row, name) {
   return i >= 0 ? row[i]?.trim() || "" : "";
 }
 
+// Delay helper to avoid API rate limiting
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function importCustomers({ admin, rows, headers }) {
   const dataRows = rows.slice(1);
   let imported = 0;
@@ -87,6 +92,11 @@ export async function importCustomers({ admin, rows, headers }) {
     } catch (err) {
       failed++;
       errors.push(`Row ${i + 2} (${email}): ${err.message}`);
+    }
+
+    // Rate-limit: small delay between API calls to avoid throttling
+    if (i < dataRows.length - 1) {
+      await delay(250);
     }
   }
 

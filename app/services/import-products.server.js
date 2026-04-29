@@ -21,6 +21,11 @@ function toBool(val) {
   return lower === "true" || lower === "yes" || lower === "1";
 }
 
+// Delay helper to avoid API rate limiting
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function determineStatus(headers, row) {
   const status = getCol(headers, row, "Status").toLowerCase();
   if (status === "active") return "ACTIVE";
@@ -49,6 +54,7 @@ export async function importProducts({ admin, rows, headers }) {
     productMap.get(handle).push(row);
   }
 
+  let productIndex = 0;
   for (const [handle, productRows] of productMap) {
     try {
       const firstRow = productRows[0];
@@ -139,9 +145,6 @@ export async function importProducts({ admin, rows, headers }) {
           headers,
           row,
           "Variant Inventory Policy"
-        );
-        const inventoryQty = parseInt(
-          getCol(headers, row, "Variant Inventory Qty") || "0"
         );
         const costPerItem = getCol(headers, row, "Cost per item");
 
@@ -286,6 +289,12 @@ export async function importProducts({ admin, rows, headers }) {
     } catch (err) {
       failed++;
       errors.push(`Error processing handle "${handle}": ${err.message}`);
+    }
+
+    // Rate-limit: delay between products to avoid API throttling
+    productIndex++;
+    if (productIndex < productMap.size) {
+      await delay(300);
     }
   }
 

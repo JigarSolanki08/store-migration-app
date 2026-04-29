@@ -12,5 +12,12 @@ export const action = async ({ request }) => {
     await db.session.deleteMany({ where: { shop } });
   }
 
+  // Clean up import job records for this shop
+  try {
+    await db.importJob.deleteMany({ where: { shop } });
+  } catch (_) {
+    // Non-fatal: import jobs are not critical data
+  }
+
   return new Response();
 };
