@@ -39,11 +39,39 @@ function determineStatus(headers, row) {
   return "ACTIVE";
 }
 
-export async function importProducts({ admin, rows, headers }) {
+export async function importProducts({ admin, rows, headers, metafieldDefs = [] }) {
   const dataRows = rows.slice(1);
   let imported = 0;
   let failed = 0;
   const errors = [];
+
+  // Detect Metafield: columns in CSV headers
+  const metafieldColumns = headers
+    .filter((h) => h.startsWith("Metafield: "))
+    .map((h) => {
+      const [namespace, ...keyParts] = h.replace("Metafield: ", "").split(".");
+      return { header: h, namespace, key: keyParts.join(".") };
+    });
+
+  // Validate against store definitions — warn on unknown, skip them
+  const unknownMeta = [];
+  const validMetaCols = metafieldColumns.filter((col) => {
+    const def = metafieldDefs.find(
+      (d) => d.namespace === col.namespace && d.key === col.key
+    );
+    if (!def) {
+      unknownMeta.push(`${col.namespace}.${col.key}`);
+      return false;
+    }
+    col.type = def.type.name;
+    return true;
+  });
+
+  if (unknownMeta.length > 0) {
+    errors.push(
+      `Warning: Metafield column(s) not found in store definitions and will be skipped: ${unknownMeta.join(", ")}`
+    );
+  }
 
   // Group rows by Handle (variants of same product share a Handle)
   const productMap = new Map();
@@ -221,6 +249,19 @@ export async function importProducts({ admin, rows, headers }) {
         productSetInput.seo = {};
         if (seoTitle) productSetInput.seo.title = seoTitle;
         if (seoDescription) productSetInput.seo.description = seoDescription;
+      }
+
+      // Add metafields from matched CSV columns
+      const metafields = validMetaCols
+        .map((col) => {
+          const value = getCol(headers, firstRow, col.header);
+          if (!value) return null;
+          return { namespace: col.namespace, key: col.key, value, type: col.type };
+        })
+        .filter(Boolean);
+
+      if (metafields.length > 0) {
+        productSetInput.metafields = metafields;
       }
 
       // --- Create product via productSet mutation ---

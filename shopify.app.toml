@@ -29,5 +29,10 @@ shop_deletion_url = "/webhooks/shop/redact"
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "write_products,write_customers,write_orders,write_draft_orders,write_content,read_products,read_customers,read_orders"
 
+[access_scopes.protected_customer_data_access]
+# Declares that this app accesses protected customer PII fields.
+# Must also be approved in the Shopify Partner Dashboard under API access.
+protected_access = true
+
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]

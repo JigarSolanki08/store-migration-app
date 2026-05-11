@@ -61,10 +61,30 @@ const ENTITY_CONFIG = {
 };
 
 export const loader = async ({ request, params }) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const config = ENTITY_CONFIG[params.type];
   if (!config) throw new Response("Not found", { status: 404 });
-  return json({ type: params.type, config: { label: config.label, icon: config.icon, requiredColumns: config.requiredColumns } });
+
+  let metafieldDefs = [];
+  if (params.type === "products") {
+    try {
+      const res = await admin.graphql(`#graphql
+        query {
+          metafieldDefinitions(ownerType: PRODUCT, first: 50) {
+            nodes { namespace key name type { name } }
+          }
+        }
+      `);
+      const mfJson = await res.json();
+      metafieldDefs = mfJson.data?.metafieldDefinitions?.nodes || [];
+    } catch (_) {}
+  }
+
+  return json({
+    type: params.type,
+    config: { label: config.label, icon: config.icon, requiredColumns: config.requiredColumns },
+    metafieldDefs,
+  });
 };
 
 function parseCSV(text) {
@@ -141,7 +161,23 @@ export const action = async ({ request, params }) => {
   });
 
   try {
-    const result = await config.importFn({ admin, rows, headers });
+    // Fetch product metafield definitions so importProducts can validate CSV columns
+    let metafieldDefs = [];
+    if (type === "products") {
+      try {
+        const res = await admin.graphql(`#graphql
+          query {
+            metafieldDefinitions(ownerType: PRODUCT, first: 50) {
+              nodes { namespace key name type { name } }
+            }
+          }
+        `);
+        const mfJson = await res.json();
+        metafieldDefs = mfJson.data?.metafieldDefinitions?.nodes || [];
+      } catch (_) {}
+    }
+
+    const result = await config.importFn({ admin, rows, headers, metafieldDefs });
     await db.importJob.update({
       where: { id: job.id },
       data: {
@@ -170,7 +206,7 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ImportPage() {
-  const { type, config } = useLoaderData();
+  const { type, config, metafieldDefs = [] } = useLoaderData();
   const actionData = useActionData();
   const navigation = useNavigation();
   const submit = useSubmit();
@@ -231,6 +267,42 @@ export default function ImportPage() {
             </Box>
           </BlockStack>
         </Card>
+
+        <Divider />
+
+        {/* Metafields info card — products only */}
+        {type === "products" && (
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">📋 Product Metafields</Text>
+              {metafieldDefs.length > 0 ? (
+                <>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Your store has <strong>{metafieldDefs.length}</strong> product metafield
+                    definition{metafieldDefs.length !== 1 ? "s" : ""}. Add the column name below to
+                    your CSV to import values into that metafield.
+                  </Text>
+                  <DataTable
+                    columnContentTypes={["text", "text", "text"]}
+                    headings={["CSV Column Header", "Label", "Type"]}
+                    rows={metafieldDefs.map((d) => [
+                      `Metafield: ${d.namespace}.${d.key}`,
+                      d.name,
+                      d.type.name,
+                    ])}
+                  />
+                </>
+              ) : (
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  No product metafield definitions found. Go to{" "}
+                  <strong>Shopify Admin → Settings → Custom data → Products</strong> to create
+                  some, then add columns like <strong>Metafield: custom.my_field</strong> to your
+                  CSV.
+                </Text>
+              )}
+            </BlockStack>
+          </Card>
+        )}
 
         <Divider />
 

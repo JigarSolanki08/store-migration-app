@@ -93,12 +93,11 @@ export async function importBlogs({ admin, rows, headers }) {
       const articleInput = {
         title: articleTitle,
         body: articleBody,
+        blogId,
         author: { name: articleAuthor },
         tags: articleTags ? articleTags.split(",").map((t) => t.trim()) : [],
         isPublished: published === "true" || published === "yes",
-        publishedAt: publishedAt || null,
-        image: imgUrl ? { src: imgUrl, altText: imgAlt || null } : null,
-        blogId,
+        image: imgUrl ? { url: imgUrl, altText: imgAlt || undefined } : undefined,
       };
 
       const articleResponse = await admin.graphql(

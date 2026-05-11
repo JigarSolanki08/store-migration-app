@@ -97,15 +97,14 @@ export default function Index() {
         {/* Welcome Banner */}
         <Banner title="Welcome to Store Migration App" tone="info">
           <p>
-            Migrate your store from any platform (WooCommerce, Magento,
-            BigCommerce, etc.) to Shopify. Download a CSV template, fill it with
-            your data, and import it directly into your store.
+            Migrate your store from any platform (WooCommerce, Magento, BigCommerce, etc.) to
+            Shopify — or export your existing Shopify data as CSV files.
           </p>
         </Banner>
 
         {/* Entity Cards */}
         <Text as="h2" variant="headingLg">
-          Choose what to migrate
+          Import or Export
         </Text>
         <Layout>
           {ENTITY_TYPES.map((entity) => (
@@ -121,21 +120,28 @@ export default function Index() {
                     {entity.description}
                   </Text>
                   <Divider />
-                  <InlineStack gap="200">
+                  <BlockStack gap="200">
+                    <InlineStack gap="200">
+                      <Button
+                        variant="primary"
+                        onClick={() => navigate(`/app/import/${entity.type}`)}
+                      >
+                        ⬆ Import {entity.label}
+                      </Button>
+                      <Button
+                        onClick={() => navigate(`/app/export/${entity.type}`)}
+                      >
+                        ⬇ Export {entity.label}
+                      </Button>
+                    </InlineStack>
                     <Button
                       url={`/app/download-template/${entity.type}`}
                       target="_blank"
                       variant="plain"
                     >
-                      ⬇ Download Template
+                      📄 Download CSV Template
                     </Button>
-                    <Button
-                      variant="primary"
-                      onClick={() => navigate(`/app/import/${entity.type}`)}
-                    >
-                      Import {entity.label}
-                    </Button>
-                  </InlineStack>
+                  </BlockStack>
                 </BlockStack>
               </Card>
             </Layout.Section>
@@ -171,8 +177,8 @@ export default function Index() {
         {/* Import History */}
         <BlockStack gap="200">
           <Text as="h2" variant="headingLg">
-            Import History
-          </Text>
+          Import History
+        </Text>
           {jobs.length === 0 ? (
             <Card>
               <EmptyState
